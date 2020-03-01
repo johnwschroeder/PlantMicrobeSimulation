@@ -152,6 +152,11 @@ psf.simulation <- function(m, #length of forest vector
                            pathogen.effect.function.heterosp #Relationship between host affinity and impact on the non-preferred host
 ) {
   exit.status <- NA #Create variable to indicate whether the simulation stopped because of an error
+  exit.step <- NA
+  equilibrium.p <- NA
+  equilibrium.time <- NA
+  stuck.sim <- FALSE
+  
   init <- initiate.forest.matrix(m,tree.species,mutualist.species.per.tree,pathogen.species.per.tree) #Create forest matrix
   forest.matrix <- init$forest.matrix #Plants IDs and positions
   mutualists.adult <- init$mutualists.adult #Mutualist IDs, positions, and abundancnes
@@ -204,6 +209,9 @@ psf.simulation <- function(m, #length of forest vector
                                                    heterospecific.affinity=s.p)
   pathogen.growth.matrix <- r.p*pathogen.effect.matrix^q.p #Create growth constant for each pathogen on each host
   pathogen.competition.matrix <- alpha.p*pathogen.effect.matrix^c.p #Create competition coefficients for each pathogen on each host
+  
+  tree.spread <- numeric(time.steps)#Initilize vector to store time series of abundance of fittest tree
+  
   if (track.over.time==TRUE) { #Initialize variables to track over time
     trees.over.time <- array(numeric(0),c(m,tree.species,time.steps)) #Array to store tree community over time
     trees.over.time[,,1] <- tree.matrix #Initial tree community
@@ -239,7 +247,7 @@ psf.simulation <- function(m, #length of forest vector
     feedback.mat <- mat.or.vec(tree.species,tree.species) #Empty matrix to fill with pairwise feedback values
     for (y in c(1:tree.species)) { 
       for (z in c(1:tree.species)) {
-        feedback.mat[y,z] <- ((surv.mat[y,y]-surv.mat[y,z])/(surv.mat[y,y]+surv.mat[y,z])+(surv.mat[z,z]-surv.mat[z,y])/(surv.mat[z,z]+surv.mat[z,y]))/2
+        feedback.mat[y,z] <- ((surv.mat[y,y]-surv.mat[y,z])/(surv.mat[y,y]+surv.mat[y,z])+(surv.mat[z,z]-surv.mat[z,y])/(surv.mat[z,z]+surv.mat[z,y]))
       }
     } #Calculate feedback per species pair
     feedback.mat[which(feedback.mat==0)] <- NA
@@ -254,19 +262,28 @@ psf.simulation <- function(m, #length of forest vector
     if ((eliminate.feedback==TRUE)&(i>=(time.steps/2))) {
       survival.probabilities <- (survival.probabilities+1)/(survival.probabilities+1)
     } #If the effect of feedback is set to stop, stop feedback halfway through the simulation
-    recruitment.probabilities <- t(f.vals*t(survival.probabilities*seed.matrix[dead.tree.IDs,])) #Recruitment probabilities of each species beneath each of the dead trees
+    
+    if (i>50) {
+      recruitment.probabilities <- t(f.vals*t(survival.probabilities*seed.matrix[dead.tree.IDs,])) #Recruitment probabilities of each species beneath each of the dead trees
+    }
+    else {
+      recruitment.probabilities <- tree.matrix[dead.tree.IDs,]
+    }
     
     if ((fix.feedback==FALSE)&(eliminate.feedback==FALSE)&(remove.pathogens==FALSE)) {
       if (length(which(is.na(recruitment.probabilities)))>0) { 
         exit.status <- 1 #Na.recruitment.probabilities
+        exit.step <- i
         break
       } #If there are NA recruitment probabilities, stop the simulation
       if (length(which(recruitment.probabilities<0))>0) { 
         exit.status <- 2 #Negative.recruitment.probabilities
+        exit.step <- i
         break
       } #If there are negative recruitment probabilities, stop the simulation
       if (length(which(recruitment.probabilities==0))==tree.species) { 
         exit.status <- 3 #No.nonzero.recruitment.probabilities
+        exit.step <- i
         break
       } #If there are no non-zero recruitment probabilities, stop the simulation
     }
@@ -313,9 +330,31 @@ psf.simulation <- function(m, #length of forest vector
       survival.over.time[,,i] <- surv.prob/rowSums(surv.prob)
     } #Record tree community, mutualists, and pathogens for current time step
     
+    #tree.1.time.ser[i] <- sum(tree.matrix[,1])
+    #tree.n.time.ser[i] <- sum(tree.matrix[,tree.species])
+    tree.spread[i] <- sum(tree.matrix[,1])-sum(tree.matrix[,tree.species])
+    
+    if (i > 600) {
+      dif <-  tree.spread[c((i-500):i)] - tree.spread[c((i-600):(i-100))]
+      dif <- dif[which(c(1:500)%%10==0)]
+      if (sd(dif,na.rm=TRUE)>0) {
+        time.corr <- t.test(dif)
+        time.corr.p <- time.corr$p.value
+      }
+      else {
+        time.corr.p <- 0
+        stuck.sim <- TRUE
+      }
+      if (is.na(time.corr.p)) {
+        time.corr.p <- 0
+      }
+      equilibrium.p <- time.corr.p
+    }
+    
     if ((fix.feedback==FALSE)&(eliminate.feedback==FALSE)&(remove.pathogens==FALSE)) {
       if (length(which(treeTab>0))<tree.species) {
         exit.status <- 4 #Tree_species_loss
+        exit.step <- i
         break
       } #If tree species go extinct, exit simulation
     }
@@ -333,6 +372,8 @@ psf.simulation <- function(m, #length of forest vector
   returns$tree.species <- tree.species
   returns$g <- g
   returns$h <- h
+  returns$equilibrium.p <- equilibrium.p
+  returns$stuck.sim <- stuck.sim
   time.vec <- c(1:time.steps)
   if (track.over.time==TRUE) {
     if (subsample==TRUE) {
@@ -350,13 +391,22 @@ psf.simulation <- function(m, #length of forest vector
       returns$survival.over.time <- survival.over.time
     }
   } #Returns if abundances were tracked over time
-  feedback.over.time[which(feedback.over.time==0)] <- -1
+  feedback.over.time[which(feedback.over.time==0)] <- -1 #So that 0 values don't get assigned as a max
   returns$max.feedback.over.time <- max(feedback.over.time,na.rm=TRUE)
+  if (subsample==TRUE) {
+    returns$max.feedback.value.50 <- max(feedback.over.time[,5])
+    returns$max.feedback.value.10 <- max(feedback.over.time[,1])
+  }
+  else {
+    returns$max.feedback.value.50 <- max(feedback.over.time[,50])
+    returns$max.feedback.value.10 <- max(feedback.over.time[,10])
+  }
   returns$b.m <- b.m
   returns$b.p <- b.p
   returns$b.t <- b.t
   returns$f.vals <- f.vals
   returns$h <- h
+  returns$exit.step <- exit.step
   returns$position <- c(g,
                         h,
                         b.t,
@@ -457,6 +507,7 @@ measure.PSF.strength <- function(modelOutput,
                               pathogen.effect=pathogen.effects,
                               g=modelOutput$g,
                               h=modelOutput$h) #Calculate survival probability of each species at each location
+  
   feedback.vec <- numeric(length(surv.prob[,1])) #Initialize vector of feedback strengths
   conspecific.vec <- numeric(length(trees))  #Initialize vector of survival beneath conspecifics
   
@@ -471,12 +522,12 @@ measure.PSF.strength <- function(modelOutput,
   mutualist.mat <- mat.or.vec(trees,trees) #Initialize matrix to fill with mutualist abundances beneath each tree
   pathogen.mat <- mat.or.vec(trees,trees) #Initialize matrix to fill with pathogen abundances beneath each tree
   
+
   for (i in c(1:trees)) {
-    surv.mat[i,] <- colMeans(surv.prob.temp[which(tree.vec==i),],na.rm=TRUE)
-    mutualist.mat[i,] <- colMeans(mutualist.effects.temp[which(tree.vec==i),],na.rm=TRUE)
-    pathogen.mat[i,] <- colMeans(pathogen.effects.temp[which(tree.vec==i),],na.rm=TRUE)
+    surv.mat[i,] <- colMeans(surv.prob.temp[which(tree.vec==i),],na.rm=TRUE) #Can take random subsample to ensure equal sample size
+    mutualist.mat[i,] <- colMeans(mutualist.effects.temp[which(tree.vec==i),],na.rm=TRUE) #Can take random subsample here to ensure equal sample size
+    pathogen.mat[i,] <- colMeans(pathogen.effects.temp[which(tree.vec==i),],na.rm=TRUE) #Can take random subsample here to ensure equal sample size
   } #Calculate mean survival probability, mutualist and pathogen abundances beneath each tree species
-  print(surv.mat)
   feedback.mat <- mat.or.vec(trees,trees) #Initialize matrix to fill with feedback strengths between each species
   feedback.mat.mutualist <- mat.or.vec(trees,trees) #Initialize matrix to fill with mutualist feedbacks
   feedback.mat.pathogen <- mat.or.vec(trees,trees) #Initialize matrix to fill with pathogen feedbacks
@@ -621,7 +672,6 @@ feedback.abundance.correlation <- function(simulationOutput) {#feedback.consp.he
                                   "mean.strength" = mean.strength.vec,
                                   "median.strength" = median.strength.vec,
                                   "sd.strength" = variance.vec)
-  print(output.data.frame)
   output.data.frame
 }
 
@@ -733,6 +783,7 @@ optimize_swarm_azure <- function(continue=FALSE, #Wethere this run is a continua
     } #Add positions from last batch onto list of explored positions
     f.vals <- sapply(position.array[,4,t],function(x) {(c(1:tree.species-1)/(tree.species-1))*(1-x)+x}) #Fitness values for all of the plant species
     if (azure==TRUE) {
+      #opts <- list(enableCloudCombine = FALSE,autoDeleteJob = FALSE)
       opts <- list(enableCloudCombine = TRUE)
     } #Define azure options
     if (azure==FALSE) {
@@ -798,6 +849,7 @@ optimize_swarm_azure <- function(continue=FALSE, #Wethere this run is a continua
                             microbe.dispersal.function=microbe.dispersal.function,
                             track.over.time=FALSE))
     
+    
     cat("Simulation run time: ", (proc.time()-ptm)[3]/60, " min\n") #Print simulation run time
     ############################################################################
     #Evaluate output
@@ -816,33 +868,40 @@ optimize_swarm_azure <- function(continue=FALSE, #Wethere this run is a continua
                                "Abundance"=matrix(unlist(lapply(PSF.strength,function(x) {x$Abundance.Freq})),ncol=tree.species,byrow=TRUE)) #Convert PSF output to data frame
     feedback.correlation <- feedback.abundance.correlation(PSF.strength) #Calculate feedback-abundance correlations
     correl.feedback <- feedback.correlation$coefficient.feedback 
-    correl.feedback[which(is.na(correl.feedback))] <- 0 #Assign value of 0 to NA values (careful to not use stats in which 0 is a meaningful value)
+    correl.feedback[which(is.na(correl.feedback))] <- (-2.1) #Assign value of -2 to NA values (careful to not use stats in which -2 is a meaningful value)
     correl.feedback.mutualist <- feedback.correlation$coefficient.feedback.mutualist
-    correl.feedback.mutualist[which(is.na(correl.feedback.mutualist))] <- 0
+    correl.feedback.mutualist[which(is.na(correl.feedback.mutualist))] <- (-2.1)
     correl.feedback.pathogen <- feedback.correlation$coefficient.feedback.pathogen
-    correl.feedback.pathogen[which(is.na(correl.feedback.pathogen))] <- 0
+    correl.feedback.pathogen[which(is.na(correl.feedback.pathogen))] <- (-2.1)
     correl.conspecific <- feedback.correlation$coefficient.conspecific
-    correl.conspecific[which(is.na(correl.conspecific))] <- 0
+    correl.conspecific[which(is.na(correl.conspecific))] <- (-2.1)
     correl.heterospecific <- feedback.correlation$coefficient.heterospecific
-    correl.heterospecific[which(is.na(correl.heterospecific))] <- 0
+    correl.heterospecific[which(is.na(correl.heterospecific))] <- (-2.1)
     max.feedback.strength <- feedback.correlation$max.strength
-    max.feedback.strength[which(is.na(max.feedback.strength))] <- 0
+    max.feedback.strength[which(is.na(max.feedback.strength))] <- (-2.1)
     mean.feedback.strength <- feedback.correlation$mean.strength
-    mean.feedback.strength[which(is.na(mean.feedback.strength))] <- 0
+    mean.feedback.strength[which(is.na(mean.feedback.strength))] <- (-2.1)
     sd.plant.abundance <- unlist(lapply(simulation.results,function(x) {sd(x$tree.community)}))
     heterospecific.neighbor.proportion <- unlist(lapply(simulation.results,function(x) {nearest.neighbor.heterospecific(x$forest.matrix)}))
     plant.richness.vec <- unlist(lapply(simulation.results,function(x) {specnumber(x$tree.community)}))
     plant.diversity.vec <- unlist(lapply(simulation.results,function(x) {diversity(x$tree.community)}))
     plant.abundance.variation <- unlist(lapply(simulation.results,function(x) {sd(x$tree.community)}))
-    mut.richness.vec <- unlist(lapply(simulation.results,function(x) {specnumber(colSums(x$mutualists.adult))}))
+    mut.richness.vec <- unlist(lapply(simulation.results,function(x) {length(which(colSums(x$mutualists.adult)>0.001))}))
     mut.diversity.vec <- unlist(lapply(simulation.results,function(x) {diversity(colSums(x$mutualists.adult))}))
-    pat.richness.vec <- unlist(lapply(simulation.results,function(x) {specnumber(colSums(x$pathogens.adult))}))
+    pat.richness.vec <- unlist(lapply(simulation.results,function(x) {length(which(colSums(x$pathogens.adult)>0.001))}))
     pat.diversity.vec <- unlist(lapply(simulation.results,function(x) {diversity(colSums(x$pathogens.adult))}))
     exit.status.vec <- unlist(lapply(simulation.results,function(x) {x$exit.status}))
     sd.feedback.strength <- feedback.correlation$sd.strength
-    sd.feedback.strength[which(is.na(sd.feedback.strength))] <- 0
+    sd.feedback.strength[which(is.na(sd.feedback.strength))] <- (-2.1)
     diversity.abundance.cor <- measure.diversity.abundance.correlation(simulation.results)
     max.feedback.over.time <- unlist(lapply(simulation.results,function(x) {x$max.feedback.over.time}))
+    max.feedback.strength.50 <- unlist(lapply(simulation.results,function(x) {x$max.feedback.value.50}))
+    max.feedback.strength.10 <- unlist(lapply(simulation.results,function(x) {x$max.feedback.value.10}))
+    exit.step <- unlist(lapply(simulation.results,function(x) {x$exit.step}))
+    equilibrium <- unlist(lapply(simulation.results,function(x) {x$equilibrium}))
+    stuck.sim <- unlist(lapply(simulation.results,function(x) {x$stuck.sim}))
+    
+    
     #random.seed <- unlist(lapply(simulation.results,function(x) {x$random.seed}))
     
     response.matrix <- cbind(plant.diversity.vec,
@@ -865,7 +924,12 @@ optimize_swarm_azure <- function(continue=FALSE, #Wethere this run is a continua
                              diversity.abundance.cor$Div.cor.m,
                              diversity.abundance.cor$Div.cor.p,
                              max.feedback.over.time,
-                             exit.status.vec)
+                             exit.status.vec,
+                             max.feedback.strength.50,
+                             max.feedback.strength.10,
+                             exit.step,
+                             equilibrium,
+                             stuck.sim)
     colnames(response.matrix) <- c("plant.shannon.diversity",
                                    "plant.richness",
                                    "mutualist.richness",
@@ -886,8 +950,12 @@ optimize_swarm_azure <- function(continue=FALSE, #Wethere this run is a continua
                                    "Div.cor.m",
                                    "Div.cor.p",
                                    "Max.feedback.over.time",
-                                   "Exit.status")
-    #print(response.matrix)
+                                   "Exit.status",
+                                   "Max.feedback.strength.50",
+                                   "Max.feedback.strength.10",
+                                   "Exit.step",
+                                   "Equilibrium",
+                                   "Stuck.sim")
     if ((t==1)&(continue==FALSE)) {
       explored.responses <- response.matrix
     } #Assign response matrix to explored responses
@@ -897,7 +965,12 @@ optimize_swarm_azure <- function(continue=FALSE, #Wethere this run is a continua
     ##############################################################################################################
     #Determine accuracy of random forest classifier
     ##############################################################################################################
-    responseCorr <- as.factor((explored.responses[,9] > 0.8)*(explored.responses[,17] > 0.02)*(explored.responses[,2]==5)*(explored.responses[,3]==5)*(explored.responses[,7]<0)*(is.na(explored.responses[,21]))) #Categorize runs into those that did/did not maintain diversity and generate a positive feedback-abunndace correlation
+    responseCorr <- as.factor((explored.responses[,9] > 0.8)*
+                                (explored.responses[,17] > 0.02)*
+                                (explored.responses[,2]==5)*
+                                (explored.responses[,3]==5)*
+                                (explored.responses[,7]<0)*
+                                (is.na(explored.responses[,21]))) #Categorize runs into those that did/did not maintain diversity and generate a positive feedback-abunndace correlation
     responseCorr[which(is.na(responseCorr))] <- 0 #Set NA values to 0 (i.e. FALSE)
     sampleSizesCorr <- rep(min(table(responseCorr)),length(unique(responseCorr))) #Maximum number of samples giving an equal number of 1s and 0s
     print(sampleSizesCorr)
@@ -943,7 +1016,7 @@ optimize_swarm_azure <- function(continue=FALSE, #Wethere this run is a continua
         pareto.position <- random.pareto.positions
       }
       for (d in c(1:length(position.array[1,,t+1]))) {
-        velocity.mat[i,d] <- w*velocity.mat[i,d]+c*runif(1,0,1)*(pareto.position[d]-position.array[i,d,t]) #Particle swarm equation        print(velocity.mat[i,d])
+        velocity.mat[i,d] <- w*velocity.mat[i,d]+c*runif(1,0,1)*(pareto.position[d]-position.array[i,d,t]) #Particle swarm equation     
         position.array[i,d,t+1] <- position.array[i,d,t]+velocity.mat[i,d] #Update positions acording to new velocities
         if (position.array[i,d,t+1] < bounds.mat[d,1]) {
           position.array[i,d,t+1] <- bounds.mat[d,1]+abs(position.array[i,d,t+1]-bounds.mat[d,1])%%(bounds.mat[d,2]-bounds.mat[d,1])
