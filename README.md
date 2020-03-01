@@ -1,7 +1,7 @@
 README
 ================
 John Schroeder
-1/16/2020
+3/1/2020
 
 # Introduction
 
@@ -9,9 +9,11 @@ The following R project includes code necessary to run the simulation
 for the manuscript entitled “Mutualist and pathogen traits interact to
 affect plant community structure in a spatially explicit model.” All
 functions necessary to run the simulation are included in
-Simulation\_functions.R. We also include results from 50K simulations
+Simulation\_functions.R. We also include results from 16K simulations
 runs using random parameter values in
-Simulation\_results\_50K\_random\_runs.RData.
+./RunFiles/sim\_results\_random.RData. Simulation results from the
+step-wise optimization are stored in files labeled
+./RunFiles/sim\_opt\_step\*.RData.
 
 The following R packages are required to run the simulation
 
@@ -40,32 +42,25 @@ registerDoSNOW(cl) #Register cluster
 ```
 
 Define parameter values and settings for simulation runs (this example
-runs simulations with identical parameter values four
-times):
+runs simulations with identical parameter values four times):
 
 ``` r
-position <- as.matrix(cbind('g' = 8.939777, 'h' = 0.4086455, 'b.t' = 2.124761, 'f' = 0.8,
-               's.m' = 0.7367272, 'b.m' = 2.318665, 'alpha.m' = 1.164921,
-               'gamma.m' = 0.2254993, 'r.m' = 0.6809609, 'q.m' = -0.07401046, 'c.m' = 1.677422,
-               's.p' = 0.04722473, 'b.p' = 2.840781, 'alpha.p' = 0.8030246,
-               'gamma.p' = 0.9312558, 'r.p' = 0.5455649, 'q.p' = 1.857254, 'c.p' = 1.442391))
-particle.positions <- as.data.frame(position[rep(1,4),])
+load("./RunFiles/position.RData")
 number.of.runs <- 4
+particle.positions <- as.data.frame(position[rep(1,number.of.runs),])
 tree.species <- 5
 trees.in.forest <- 499
 mort <- 0.1
 mortality.replacement.steps <- 3000
-eliminate.feedback <- c(rep(FALSE,4))
-fix.feedback <- c(rep(FALSE,4))
-remove.mutualists <- c(rep(FALSE,4))
-remove.pathogens <- c(rep(FALSE,4))
+eliminate.feedback <- c(rep(FALSE,number.of.runs))
+fix.feedback <- c(rep(FALSE,number.of.runs))
+remove.mutualists <- c(rep(FALSE,number.of.runs))
+remove.pathogens <- c(rep(FALSE,number.of.runs))
 f.vals <- t(sapply(particle.positions[,4],function(x) {(c(1:tree.species-1)/(tree.species-1))*(1-x)+x}))
 pb <- txtProgressBar(max = number.of.runs, style = 3)
 ```
 
-    ## 
-      |                                                                       
-      |                                                                 |   0%
+    ##   |                                                                              |                                                                      |   0%
 
 ``` r
 progress <- function(n) setTxtProgressBar(pb, n)
@@ -141,12 +136,4 @@ simulation.results <- foreach(g = particle.positions$g,
                             track.over.time = TRUE))
 ```
 
-    ## 
-      |                                                                       
-      |================                                                 |  25%
-      |                                                                       
-      |================================                                 |  50%
-      |                                                                       
-      |=================================================                |  75%
-      |                                                                       
-      |=================================================================| 100%
+    ##   |                                                                              |==================                                                    |  25%  |                                                                              |===================================                                   |  50%  |                                                                              |====================================================                  |  75%  |                                                                              |======================================================================| 100%
