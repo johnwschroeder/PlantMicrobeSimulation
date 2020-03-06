@@ -1,7 +1,7 @@
 README
 ================
 John Schroeder
-3/1/2020
+3/5/2020
 
 # Introduction
 
@@ -23,12 +23,17 @@ library(randomForest) #For conducting random forest analyses between batches of 
 library(abind) #For binding lists of results
 library(poweRlaw) #For generating dispersal kernels
 library(vegan)
+library(dplyr) #For plotting
+library(plotrix) #For plotting
+library(ggplot2) #For plotting
+library(RColorBrewer) #For plotting
 ```
 
-Source code for the simulation functions:
+Source code for the simulation functions and plotting functions:
 
 ``` r
 source("./Simulation_functions.R")
+source("./Simulation_plotting_functions.R")
 ```
 
 The following code chunks conduct an example simulation run using the
@@ -137,3 +142,65 @@ simulation.results <- foreach(g = particle.positions$g,
 ```
 
     ##   |                                                                              |==================                                                    |  25%  |                                                                              |===================================                                   |  50%  |                                                                              |====================================================                  |  75%  |                                                                              |======================================================================| 100%
+
+Plot results analogous to those presented in Figure 1a and 1b (these
+will likely be noisy with just 4 simulation
+runs)
+
+``` r
+mutualist.spatial.patterns <- calculate.microbes.through.space(modelOutput = simulation.results, mu.or.pa = "mu",indices = c(1:4),ncells=5)
+pathogen.spatial.patterns <- calculate.microbes.through.space(modelOutput = simulation.results, mu.or.pa = "pa",indices = c(1:4), ncells=5)
+survival.spatial.patterns <- plot.survival.through.space(simulation.results,indices = c(1:4),ncells = 5,fitness.dif=FALSE)
+fungi.abund.plot <- plot.microbes.through.space(mutualist.spatial.patterns,pathogen.spatial.patterns,survival.spatial.patterns)
+fungi.abund.plot
+```
+
+![](README_files/figure-gfm/unnamed-chunk-6-1.png)<!-- --> Plot results
+analogous to those in Fig 1c
+
+``` r
+PSF.strength <- foreach(index=c(1:4)) %do% ( #Run in sequence
+  measure.PSF.strength(modelOutput = simulation.results[[index]],dpldis))
+
+psf.plot <- plot.feedback.per.species(cndd.strength = PSF.strength,simulation.results = simulation.results,index=c(1:4))
+
+psf.plot
+```
+
+![](README_files/figure-gfm/unnamed-chunk-7-1.png)<!-- --> Plot results
+analogous to those in 2a. These use average results from one simulation,
+but results do not vary much from simulation to
+simulation
+
+``` r
+mutualists.over.time <- calculate.microbes.over.time.single.tree(simulation.results[[1]],"mu",time.steps=50,step.range=c(50:3000))
+pathogens.over.time <- calculate.microbes.over.time.single.tree(simulation.results[[1]],"pa",time.steps=50,step.range=c(50:3000))
+microbes.over.time <- plot.microbes.over.time(mutualists.over.time,pathogens.over.time)
+microbes.over.time
+```
+
+![](README_files/figure-gfm/unnamed-chunk-8-1.png)<!-- -->
+
+Plot results analogous to those in
+2b
+
+``` r
+survival.over.time <- survival.over.time.single.tree(simulation.results[[1]],time.steps=50,step.range=c(50:3000))
+survival.over.time
+```
+
+![](README_files/figure-gfm/unnamed-chunk-9-1.png)<!-- --> Plot results
+analogous to those in Fig 3a. Here, we display population dynamics from
+the start of the simulation. There is no change in plant abundances for
+the first 50 time steps because it represents a conditioning phase after
+which we measure
+PSF.
+
+``` r
+tree.abundances <- plot.tree.abundances.over.time(simulation.results,step.range=c(1:3000),indices = c(1:4),xlim=c(0,12))
+tree.abundances
+```
+
+    ## Warning: Removed 180 rows containing missing values (geom_path).
+
+![](README_files/figure-gfm/unnamed-chunk-10-1.png)<!-- -->
