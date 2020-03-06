@@ -1,5 +1,5 @@
 #John Schroeder
-#1-March-2020
+#5-March-2020
 #Spatially explicit plant-microbe interactions simulation
 
 #######################################################################################################################################################################################################################################################
@@ -151,6 +151,7 @@ psf.simulation <- function(m, #length of forest vector
                            pathogen.effect.function.consp, #Relationship between host affinity and impact on the preferred host
                            pathogen.effect.function.heterosp #Relationship between host affinity and impact on the non-preferred host
 ) {
+  print("hello")
   exit.status <- NA #Create variable to indicate whether the simulation stopped because of an error
   exit.step <- NA
   equilibrium.p <- NA
@@ -374,6 +375,7 @@ psf.simulation <- function(m, #length of forest vector
   returns$h <- h
   returns$equilibrium.p <- equilibrium.p
   returns$stuck.sim <- stuck.sim
+  returns$seed.matrix <- seed.matrix
   time.vec <- c(1:time.steps)
   if (track.over.time==TRUE) {
     if (subsample==TRUE) {
@@ -522,12 +524,16 @@ measure.PSF.strength <- function(modelOutput,
   mutualist.mat <- mat.or.vec(trees,trees) #Initialize matrix to fill with mutualist abundances beneath each tree
   pathogen.mat <- mat.or.vec(trees,trees) #Initialize matrix to fill with pathogen abundances beneath each tree
   
-
+  #sample.size <- min(modelOutput$tree.community)
+  #print(sample.size)
+  
   for (i in c(1:trees)) {
+    #subSampIndices <- sample(which(tree.vec==i),sample.size)
     surv.mat[i,] <- colMeans(surv.prob.temp[which(tree.vec==i),],na.rm=TRUE) #Can take random subsample to ensure equal sample size
     mutualist.mat[i,] <- colMeans(mutualist.effects.temp[which(tree.vec==i),],na.rm=TRUE) #Can take random subsample here to ensure equal sample size
     pathogen.mat[i,] <- colMeans(pathogen.effects.temp[which(tree.vec==i),],na.rm=TRUE) #Can take random subsample here to ensure equal sample size
   } #Calculate mean survival probability, mutualist and pathogen abundances beneath each tree species
+  #print(surv.mat)
   feedback.mat <- mat.or.vec(trees,trees) #Initialize matrix to fill with feedback strengths between each species
   feedback.mat.mutualist <- mat.or.vec(trees,trees) #Initialize matrix to fill with mutualist feedbacks
   feedback.mat.pathogen <- mat.or.vec(trees,trees) #Initialize matrix to fill with pathogen feedbacks
@@ -672,6 +678,7 @@ feedback.abundance.correlation <- function(simulationOutput) {#feedback.consp.he
                                   "mean.strength" = mean.strength.vec,
                                   "median.strength" = median.strength.vec,
                                   "sd.strength" = variance.vec)
+  #print(output.data.frame)
   output.data.frame
 }
 
@@ -956,6 +963,7 @@ optimize_swarm_azure <- function(continue=FALSE, #Wethere this run is a continua
                                    "Exit.step",
                                    "Equilibrium",
                                    "Stuck.sim")
+    #print(response.matrix)
     if ((t==1)&(continue==FALSE)) {
       explored.responses <- response.matrix
     } #Assign response matrix to explored responses
@@ -1016,7 +1024,7 @@ optimize_swarm_azure <- function(continue=FALSE, #Wethere this run is a continua
         pareto.position <- random.pareto.positions
       }
       for (d in c(1:length(position.array[1,,t+1]))) {
-        velocity.mat[i,d] <- w*velocity.mat[i,d]+c*runif(1,0,1)*(pareto.position[d]-position.array[i,d,t]) #Particle swarm equation     
+        velocity.mat[i,d] <- w*velocity.mat[i,d]+c*runif(1,0,1)*(pareto.position[d]-position.array[i,d,t]) #Particle swarm equation        print(velocity.mat[i,d])
         position.array[i,d,t+1] <- position.array[i,d,t]+velocity.mat[i,d] #Update positions acording to new velocities
         if (position.array[i,d,t+1] < bounds.mat[d,1]) {
           position.array[i,d,t+1] <- bounds.mat[d,1]+abs(position.array[i,d,t+1]-bounds.mat[d,1])%%(bounds.mat[d,2]-bounds.mat[d,1])
