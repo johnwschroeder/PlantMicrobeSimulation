@@ -447,6 +447,10 @@ calculate.microbes.over.time.single.tree <- function(modelOutput, #List of simul
       dff <- bind_rows(dff,df)
     }
   }
+<<<<<<< HEAD
+=======
+  print(df)
+>>>>>>> bc2c5b3d54e479de75dc60a0881fd5ec6263e731
   df <- aggregate(Abundance ~ Focal.tree +
                     Preferred.host +
                     Time,data=dff,FUN=mean)
@@ -508,6 +512,10 @@ survival.over.time.single.tree <- function(modelOutput, #List of simulation resu
     surv.over.time <- modelOutput[[x]]$survival.over.time[,,step.range]
     trees.over.time <- modelOutput[[x]]$trees.over.time[,,step.range]
     time.array <- modelOutput[[x]]$trees.over.time[,,step.range]
+<<<<<<< HEAD
+=======
+    #print(time.array)
+>>>>>>> bc2c5b3d54e479de75dc60a0881fd5ec6263e731
     for (i in c(2:length(trees.over.time[1,1,]))) {
       time.array[,,i] <- time.array[,,i-1] + trees.over.time[,,i]
       time.array[,,i][which(trees.over.time[,,i-1]-trees.over.time[,,i]==1)] <- 0

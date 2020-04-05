@@ -7,7 +7,8 @@ output: github_document
 
 Introduction
 =======
-The following R project includes code necessary to run the simulation for the manuscript entitled "Mutualist and pathogen traits interact to affect plant community structure in a spatially explicit model." All functions necessary to run the simulation are included in Simulation_functions.R. We also include results from 16K simulations runs using random parameter values in ./RunFiles/sim_results_random.RData. Simulation results from the step-wise optimization are stored in files labeled ./RunFiles/sim_opt_step*.RData.
+The following R project includes code necessary to run the simulation for the manuscript entitled "Mutualist and pathogen traits interact to affect plant community structure in a spatially explicit model." All functions necessary to run the simulation are included in Simulation_functions.R. We also include results from 16K simulations runs using random parameter values in ./RunFiles/sim_results_random.RData. Simulation results from the step-wise optimization are stored in files labeled ./RunFiles/sim_opt_step*.RData. This project is archived under: [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3735452.svg)](https://doi.org/10.5281/zenodo.3735452)
+
 
 The following R packages are required to run the simulation
 ```{r,warning=FALSE, message=FALSE}
