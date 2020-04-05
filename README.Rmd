@@ -1,7 +1,7 @@
 ---
 title: "README"
 author: "John Schroeder"
-date: "3/5/2020"
+date: "4/5/2020"
 output: github_document
 ---
 
@@ -28,7 +28,7 @@ source("./Simulation_functions.R")
 source("./Simulation_plotting_functions.R")
 ```
 
-The following code chunks conduct an example simulation run using the parameter values presented in Table 1 of Schroeder et al. (2020, in review)
+The following code chunks conduct an example simulation run using the parameter values presented in Table 1 of Schroeder et al. (2020, Nature Communications)
 ```{r}
 numcores <- 4 #Define the number of cores to use to simultaneously run multiple simulations
 cl <- parallel::makeCluster(numcores) #Create cluster
@@ -139,19 +139,19 @@ psf.plot
 ```
 Plot results analogous to those in 2a. These use average results from one simulation, but results do not vary much from simulation to simulation
 ```{r}
-mutualists.over.time <- calculate.microbes.over.time.single.tree(simulation.results[[1]],"mu",time.steps=50,step.range=c(50:3000))
-pathogens.over.time <- calculate.microbes.over.time.single.tree(simulation.results[[1]],"pa",time.steps=50,step.range=c(50:3000))
+mutualists.over.time <- calculate.microbes.over.time.single.tree(simulation.results,"mu",time.steps=50,step.range=c(50:3000),indices = c(1:4))
+pathogens.over.time <- calculate.microbes.over.time.single.tree(simulation.results,"pa",time.steps=50,step.range=c(50:3000), indices = c(1:4))
 microbes.over.time <- plot.microbes.over.time(mutualists.over.time,pathogens.over.time)
 microbes.over.time
 ```
 
 Plot results analogous to those in 2b
 ```{r,warning=FALSE}
-survival.over.time <- survival.over.time.single.tree(simulation.results[[1]],time.steps=50,step.range=c(50:3000))
+survival.over.time <- survival.over.time.single.tree(simulation.results,time.steps=50,step.range=c(50:3000),indices=c(1:4))
 survival.over.time
 ```
 Plot results analogous to those in Fig 3a. Here, we display population dynamics from the start of the simulation. There is no change in plant abundances for the first 50 time steps because it represents a conditioning phase after which we measure PSF.
 ```{r}
-tree.abundances <- plot.tree.abundances.over.time(simulation.results,step.range=c(1:3000),indices = c(1:4),xlim=c(0,12))
+tree.abundances <- plot.tree.abundances.over.time(simulation.results,step.range=c(1:3000),indices = c(1:4),xlim=c(0,16))
 tree.abundances
 ```

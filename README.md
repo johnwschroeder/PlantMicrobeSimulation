@@ -1,7 +1,7 @@
 README
 ================
 John Schroeder
-3/5/2020
+4/5/2020
 
 # Introduction
 
@@ -37,8 +37,8 @@ source("./Simulation_plotting_functions.R")
 ```
 
 The following code chunks conduct an example simulation run using the
-parameter values presented in Table 1 of Schroeder et al. (2020, in
-review)
+parameter values presented in Table 1 of Schroeder et al. (2020, Nature
+Communications)
 
 ``` r
 numcores <- 4 #Define the number of cores to use to simultaneously run multiple simulations
@@ -173,8 +173,8 @@ but results do not vary much from simulation to
 simulation
 
 ``` r
-mutualists.over.time <- calculate.microbes.over.time.single.tree(simulation.results[[1]],"mu",time.steps=50,step.range=c(50:3000))
-pathogens.over.time <- calculate.microbes.over.time.single.tree(simulation.results[[1]],"pa",time.steps=50,step.range=c(50:3000))
+mutualists.over.time <- calculate.microbes.over.time.single.tree(simulation.results,"mu",time.steps=50,step.range=c(50:3000),indices = c(1:4))
+pathogens.over.time <- calculate.microbes.over.time.single.tree(simulation.results,"pa",time.steps=50,step.range=c(50:3000), indices = c(1:4))
 microbes.over.time <- plot.microbes.over.time(mutualists.over.time,pathogens.over.time)
 microbes.over.time
 ```
@@ -185,7 +185,7 @@ Plot results analogous to those in
 2b
 
 ``` r
-survival.over.time <- survival.over.time.single.tree(simulation.results[[1]],time.steps=50,step.range=c(50:3000))
+survival.over.time <- survival.over.time.single.tree(simulation.results,time.steps=50,step.range=c(50:3000),indices=c(1:4))
 survival.over.time
 ```
 
@@ -197,10 +197,8 @@ which we measure
 PSF.
 
 ``` r
-tree.abundances <- plot.tree.abundances.over.time(simulation.results,step.range=c(1:3000),indices = c(1:4),xlim=c(0,12))
+tree.abundances <- plot.tree.abundances.over.time(simulation.results,step.range=c(1:3000),indices = c(1:4),xlim=c(0,16))
 tree.abundances
 ```
-
-    ## Warning: Removed 180 rows containing missing values (geom_path).
 
 ![](README_files/figure-gfm/unnamed-chunk-10-1.png)<!-- -->

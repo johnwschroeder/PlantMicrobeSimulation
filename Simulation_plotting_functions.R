@@ -1,5 +1,5 @@
 #John Schroeder
-#5-March-2020
+#5-April-2020
 #Spatially explicit plant-microbe interactions simulation plotting functions
 
 #######################################################################################################################################################################################################################################################
@@ -42,7 +42,6 @@ calculate.microbes.through.space <- function(modelOutput, #List of simulation re
     mutualist <- (modelOutput[[i]]$mutualists.adult + modelOutput[[i]]$gamma.m*mutualist.propagule.matrix)
     pathogen <- (modelOutput[[i]]$pathogens.adult + modelOutput[[i]]$gamma.p*pathogen.propagule.matrix)
     
-    
     tree.community <- modelOutput[[i]]$tree.community
     dummy <- c(1,3,5)
     indicesd <- dummy
@@ -75,34 +74,39 @@ calculate.microbes.through.space <- function(modelOutput, #List of simulation re
     dat$host[which(dat$host==dummy[1])] <- 1
     dat$host[which(dat$host==dummy[2])] <- 2
     dat$host[which(dat$host==dummy[3])] <- 3
+    
+    df <- data.frame("Focal.sp"=numeric((ncells+1)*6),"Host"=numeric((ncells+1)*6),"Abundance"=numeric((ncells+1)*6),
+                     "std.error.Abundance"=numeric((ncells+1)*6),"Distance"=numeric((ncells+1)*6))
+    df$Adult <- rep(c(c("High",rep("Heterospecific",ncells)),
+                      c("Medium",rep("Heterospecific",ncells)),
+                      c("Low",rep("Heterospecific",ncells))),2)
+    df$Focal.sp <- c(rep("High",2*(ncells+1)),rep("Medium",2*(ncells+1)),rep("Low",2*(ncells+1)))
+    df$Host <- c(rep("High",(ncells+1)),rep("Heterospecific",(ncells+1)),
+                 rep("Medium",(ncells+1)),rep("Heterospecific",(ncells+1)),
+                 rep("Low",(ncells+1)),rep("Heterospecific",(ncells+1)))
+    df$Distance <- rep(c(0:ncells),6)
+    for (j in c(1:3)) {
+      for (k in c(0:ncells)) {
+        datSubs <- dat[which(dat[,(6+j)]==k),]
+        df$Abundance[(j-1)*2*(ncells+1)+k+1] <- mean(datSubs[,(2+j)])
+        df$std.error.Abundance[(j-1)*2*(ncells+1)+k+1] <- std.error(datSubs[,(2+j)])
+        df$Abundance[(j-1)*2*(ncells+1)+(ncells+1)+k+1] <- mean(unlist(datSubs[,(2+c(1:3)[-j])]))
+        df$std.error.Abundance[(j-1)*2*(ncells+1)+(ncells+1)+k+1] <- std.error(unlist(datSubs[,(2+c(1:3)[-j])]))
+      }
+    }
+    df$run.number <- i
+    
     if (i == min(indices)) {
-      datt <- dat
+      dff <- df
     }
     else {
-      datt <- bind_rows(datt,dat)
+      dff <- bind_rows(dff,df)
     }
+    
   }
-  dat <- datt
-  
-  df <- data.frame("Focal.sp"=numeric((ncells+1)*6),"Host"=numeric((ncells+1)*6),"Abundance"=numeric((ncells+1)*6),
-                   "std.error.Abundance"=numeric((ncells+1)*6),"Distance"=numeric((ncells+1)*6))
-  df$Adult <- rep(c(c("High",rep("Heterospecific",ncells)),
-                    c("Medium",rep("Heterospecific",ncells)),
-                    c("Low",rep("Heterospecific",ncells))),2)
-  df$Focal.sp <- c(rep("High",2*(ncells+1)),rep("Medium",2*(ncells+1)),rep("Low",2*(ncells+1)))
-  df$Host <- c(rep("High",(ncells+1)),rep("Heterospecific",(ncells+1)),
-               rep("Medium",(ncells+1)),rep("Heterospecific",(ncells+1)),
-               rep("Low",(ncells+1)),rep("Heterospecific",(ncells+1)))
-  df$Distance <- rep(c(0:ncells),6)
-  for (i in c(1:3)) {
-    for (k in c(0:ncells)) {
-      datSubs <- dat[which(dat[,(6+i)]==k),]
-      df$Abundance[(i-1)*2*(ncells+1)+k+1] <- mean(datSubs[,(2+i)])
-      df$std.error.Abundance[(i-1)*2*(ncells+1)+k+1] <- std.error(datSubs[,(2+i)])
-      df$Abundance[(i-1)*2*(ncells+1)+(ncells+1)+k+1] <- mean(unlist(datSubs[,(2+c(1:3)[-i])]))
-      df$std.error.Abundance[(i-1)*2*(ncells+1)+(ncells+1)+k+1] <- std.error(unlist(datSubs[,(2+c(1:3)[-i])]))
-    }
-  }
+
+  df <- aggregate(Abundance ~ Focal.sp+Host+Distance+Adult,data=dff,FUN=mean)
+  df$std.error.Abundance <- aggregate(Abundance ~ Focal.sp+Host+Distance+Adult,data=dff,FUN=std.error)$Abundance
   
   if (mu.or.pa=="mu") {
     df$Guild <- "Mutualist"
@@ -113,11 +117,15 @@ calculate.microbes.through.space <- function(modelOutput, #List of simulation re
   return(df)
 }
 
+
 #######################
 #plot.microbes.through.space
 #Returns plot of average microbe abundances with increasing distance from focal host
 #######################
-plot.microbes.through.space <- function(mutualists,pathogens,survival) {
+plot.microbes.through.space <- function(mutualists, #Output from calculate.microbes.through.space
+                                     pathogens, #Output from calculate.microbes.through.space
+                                     survival #Output from plot.microbes.through.space
+                                     ) {
   names(survival)[which(names(survival)=="Survival")] <- "Abundance"
   names(survival)[which(names(survival)=="std.error.survival")] <- "std.error.Abundance"
   survival$Guild <- "Survival"
@@ -128,26 +136,25 @@ plot.microbes.through.space <- function(mutualists,pathogens,survival) {
   colourCount <- 3
   getPalette1 = colorRampPalette(brewer.pal(3, "Dark2"))
   getPalette2 = colorRampPalette(brewer.pal(5, "PuOr"))
-  colors1 <- c(getPalette1(1))#,"gray")
+  colors1 <- c(getPalette1(1))
   colors2 <- c(getPalette2(2))
   colors <- c(colors2[1],colors2[2],colors1)
   
   dat <- subset(dat,Host!="Heterospecific")
   dat$Distance <- dat$Distance*6
-  plot <- ggplot(data=dat,aes(x=Distance, y=Abundance, color=Host, linetype=Guild)) + #, linetype=Guild
+  plot <- ggplot(data=dat,aes(x=Distance, y=Abundance, color=Host, linetype=Guild)) +
     theme_bw() +
     geom_line(size=1) +
     scale_color_manual(values=colors) +
     scale_fill_manual(values=colors) +
     scale_linetype_manual(values=c('dotted','dashed','solid'))+
-    geom_ribbon(data=subset(dat,Focal.sp=="High"),aes(ymin=Abundance - std.error.Abundance/(1-std.error.Abundance),ymax=Abundance + std.error.Abundance/(1-std.error.Abundance),fill=Host),alpha=0.5,color=NA) +
-    geom_ribbon(data=subset(dat,Focal.sp=="Medium"),aes(ymin=Abundance - std.error.Abundance/(1-std.error.Abundance),ymax=Abundance + std.error.Abundance/(1-std.error.Abundance),fill=Host),alpha=0.5,color=NA) +
-    geom_ribbon(data=subset(dat,Focal.sp=="Low"),aes(ymin=Abundance - std.error.Abundance/(1-std.error.Abundance),ymax=Abundance + std.error.Abundance/(1-std.error.Abundance),fill=Host),alpha=0.5,color=NA) +
+    geom_ribbon(data=subset(dat,Focal.sp=="High"),aes(ymin=Abundance - std.error.Abundance,ymax=Abundance + std.error.Abundance,fill=Host),alpha=0.5,color=NA) +
+    geom_ribbon(data=subset(dat,Focal.sp=="Medium"),aes(ymin=Abundance - std.error.Abundance,ymax=Abundance + std.error.Abundance,fill=Host),alpha=0.5,color=NA) +
+    geom_ribbon(data=subset(dat,Focal.sp=="Low"),aes(ymin=Abundance - std.error.Abundance,ymax=Abundance + std.error.Abundance,fill=Host),alpha=0.5,color=NA) +
     facet_wrap(~Guild,scales = "free_y") +
     labs(color="Fitness of\ntree species/\npreferred host") +
     guides(fill=FALSE,alpha=FALSE) +
-    
-    labs(x = "Distance (m) from focal tree",y="Abundance\nSurvival prob.")#,title="Fungal abundances",color="Tree Species\n(Host)",linetype="Guild") +
+    labs(x = "Distance (m) from focal tree",y="Abundance\nSurvival prob.")
   plot
 }
 
@@ -155,10 +162,10 @@ plot.microbes.through.space <- function(mutualists,pathogens,survival) {
 #plot.survival.through.space
 #Returns plot of average seedling survival with increasing distance from focal host
 #######################
-plot.survival.through.space <- function(modelOutput,
-                                        indices,
-                                        ncells, #Number x axis positions defining spatial window for plotting
-                                        fitness.dif #Whether to include fitness differences as part of survival probabilities (i.e. whether to see only the effect of microbes vs. the effect of microbes and host fitness)
+plot.survival.through.space <- function(modelOutput, #List of simulation results
+                                        indices, #Vector of indices of model output
+                                        ncells, #Distance (in cells) to show survival distribution
+                                        fitness.dif #True or false. Whether to account for fitness differences in calculating survival probability
                                         ) {
   for (k in indices) {
     forest.matrix <- modelOutput[[k]]$forest.matrix
@@ -188,7 +195,7 @@ plot.survival.through.space <- function(modelOutput,
     surv.prob <- trial.function(mutualist.effect=mutualist.effects,
                                 pathogen.effect=pathogen.effects,
                                 g=modelOutput[[k]]$g,
-                                h=modelOutput[[k]]$h)#*rev(modelOutput[[k]]$f.vals)
+                                h=modelOutput[[k]]$h)
     if (fitness.dif == TRUE) {
       surv.prob <- t(as.matrix(f.vals))[rep(1,length(surv.prob[,1])),]*surv.prob
     }
@@ -220,72 +227,69 @@ plot.survival.through.space <- function(modelOutput,
     colnames(dist.mat) <- c("Dist.1","Dist.2","Dist.3")
     
     dat <- cbind(dat,dist.mat)
+    
+    dat$host[which((dat$host != dummy[1])&(dat$host != dummy[2])&(dat$host != dummy[3]))] <- 8
+    dat$host[which(dat$host==dummy[1])] <- 1
+    dat$host[which(dat$host==dummy[2])] <- 2
+    dat$host[which(dat$host==dummy[3])] <- 3
+    
+    df <- data.frame("Focal.sp"=numeric((ncells+1)*6),"Host"=numeric((ncells+1)*6),"Survival"=numeric((ncells+1)*6),
+                     "std.error.survival"=numeric((ncells+1)*6),"Distance"=numeric((ncells+1)*6))
+    df$Focal.sp <- rep(c(rep("High",(ncells+1)),
+                         rep("Medium",(ncells+1)),
+                         rep("Low",(ncells+1))),2)
+    df$Adult <- c(c("High",rep("Heterospecific",ncells)),
+                  c("Medium",rep("Heterospecific",ncells)),
+                  c("Low",rep("Heterospecific",ncells)))
+    df$Host <- c(c(rep("High",(ncells+1)),rep("Medium",(ncells+1)),rep("Low",(ncells+1))),
+                 rep("Heterospecific",(ncells+1)*3))
+    df$Distance <- rep(c(0:ncells),6)
+    
+    for (j in c(1:3)) {
+      dat1 <- subset(dat,Tree.species%in%paste("TSp.",dummy[j],sep=""))
+      datConsp <- dat1[which(dat1[,(4+j)]==0),]
+      df$Survival[((j-1)*(ncells+1)+1)] <- mean(datConsp[,3])
+      df$std.error.survival[((j-1)*(ncells+1)+1)] <- std.error(datConsp[,3])
+      for (i in c(1:ncells)) {
+        datHet <- dat1[which(dat1[,(4+j)]==i),]
+        df$Survival[((j-1)*(ncells+1)+i+1)] <- mean(datHet[,3])
+        df$std.error.survival[((j-1)*(ncells+1)+i+1)] <- std.error(datHet[,3])
+      }
+    }
+    
+    for (j in c(1:3)) {
+      dat1 <- subset(dat,Tree.species%in%paste("TSp.",c(dummy[c(1:3)[-j]]),sep=""))
+      datConsp <- dat1[which(dat1[,(4+j)]==0),]
+      df$Survival[3*(ncells+1) + ((j-1)*(ncells+1)+1)] <- mean(datConsp[,3])
+      df$std.error.survival[3*(ncells+1) + ((j-1)*(ncells+1)+1)] <- std.error(datConsp[,3])
+      for (i in c(1:ncells)) {
+        datHet <- dat1[which(dat1[,(4+j)]==i),]
+        df$Survival[3*(ncells+1) + ((j-1)*(ncells+1)+i+1)] <- mean(datHet[,3])
+        df$std.error.survival[3*(ncells+1) + ((j-1)*(ncells+1)+i+1)] <- std.error(datHet[,3])
+      }
+    }
+    
+    df$run <- k
     if (k == min(indices)) {
-      datt <- dat
+      dff <- df
     }
     else {
-      datt <- bind_rows(datt,dat)
+      dff <- bind_rows(dff,df)
     }
   }
-  dat <- datt
-  dat$host[which((dat$host != dummy[1])&(dat$host != dummy[2])&(dat$host != dummy[3]))] <- 8
-  dat$host[which(dat$host==dummy[1])] <- 1
-  dat$host[which(dat$host==dummy[2])] <- 2
-  dat$host[which(dat$host==dummy[3])] <- 3
-  
-  df <- data.frame("Focal.sp"=numeric((ncells+1)*6),"Host"=numeric((ncells+1)*6),"Survival"=numeric((ncells+1)*6),
-                   "std.error.survival"=numeric((ncells+1)*6),"Distance"=numeric((ncells+1)*6))
-  df$Focal.sp <- rep(c(rep("High",(ncells+1)),
-                       rep("Medium",(ncells+1)),
-                       rep("Low",(ncells+1))),2)
-  df$Adult <- c(c("High",rep("Heterospecific",ncells)),
-                c("Medium",rep("Heterospecific",ncells)),
-                c("Low",rep("Heterospecific",ncells)))
-  df$Host <- c(c(rep("High",(ncells+1)),rep("Medium",(ncells+1)),rep("Low",(ncells+1))),
-               rep("Heterospecific",(ncells+1)*3))
-  df$Distance <- rep(c(0:ncells),6)
-  
-  for (i in c(1:3)) {
-    dat1 <- subset(dat,Tree.species%in%paste("TSp.",dummy[i],sep=""))
-    datConsp <- dat1[which(dat1[,(4+i)]==0),]
-    df$Survival[((i-1)*(ncells+1)+1)] <- mean(datConsp[,3])
-    df$std.error.survival[((i-1)*(ncells+1)+1)] <- std.error(datConsp[,3])
-    for (j in c(1:ncells)) {
-      datHet <- dat1[which(dat1[,(4+i)]==j),]
-      df$Survival[((i-1)*(ncells+1)+j+1)] <- mean(datHet[,3])
-      df$std.error.survival[((i-1)*(ncells+1)+j+1)] <- std.error(datHet[,3])
-    }
-  }
-  
-  for (i in c(1:3)) {
-    dat1 <- subset(dat,Tree.species%in%paste("TSp.",c(dummy[c(1:3)[-i]]),sep=""))
-    datConsp <- dat1[which(dat1[,(4+i)]==0),]
-    df$Survival[3*(ncells+1) + ((i-1)*(ncells+1)+1)] <- mean(datConsp[,3])
-    df$std.error.survival[3*(ncells+1) + ((i-1)*(ncells+1)+1)] <- std.error(datConsp[,3])
-    for (j in c(1:ncells)) {
-      datHet <- dat1[which(dat1[,(4+i)]==j),]
-      df$Survival[3*(ncells+1) + ((i-1)*(ncells+1)+j+1)] <- mean(datHet[,3])
-      df$std.error.survival[3*(ncells+1) + ((i-1)*(ncells+1)+j+1)] <- std.error(datHet[,3])
-    }
-  }
-  colourCount <- 3#length(unique(dat$Tree.species))
+  df <- aggregate(Survival ~ Focal.sp+Host+Distance+Adult,data=dff,FUN=mean)
+  df$std.error.survival <- aggregate(Survival ~ Focal.sp+Host+Distance+Adult,data=dff,FUN=std.error)$Survival
+
+  colourCount <- 3
   getPalette1 = colorRampPalette(brewer.pal(3, "Dark2"))
   getPalette2 = colorRampPalette(brewer.pal(5, "PuOr"))
-  colors1 <- c(getPalette1(1))#,"gray")
+  colors1 <- c(getPalette1(1))
   colors2 <- c(getPalette2(2))
   colors <- c(colors2[1],colors2[2],colors1)
   
   df <- subset(df,Host!="Heterospecific")
   
   return(df)
-  plot <- ggplot(data=df,aes(x=log(Distance*6), y=Survival, color=Host)) +
-    theme_bw() +
-    geom_line() +
-    geom_ribbon(aes(ymin=Survival-std.error.survival,ymax=Survival+std.error.survival,fill=Host),alpha=0.5,color=NA) +
-    scale_color_manual(values=colors) +
-    scale_fill_manual(values=colors) +
-    labs(x = "Dist. (m) from consp.",y="Rel. surv. prob.")#,y="Fungal Abundances",title="Fungal abundances",color="Tree Species\n(Host)",linetype="Guild") +
-  plot
 }
 
 #######################
@@ -387,54 +391,68 @@ plot.feedback.per.species <- function(cndd.strength,
 #calculate.microbes.over.time.single.tree
 #Returns data frame with average temporal dynamics of microbial abundances on a single host through time
 #######################
-calculate.microbes.over.time.single.tree <- function(modelOutput,
-                                                     mu.or.pa,
-                                                     time.steps,
-                                                     step.range) {
-  if (mu.or.pa=="mu") {
-    mic.over.time <- modelOutput$mutualists.over.time
-    ylab = "Mutualist abundance"
-  }
-  else {
-    mic.over.time <- modelOutput$pathogens.over.time
-    ylab = "Pathogen abundance"
-  }
-  mic.over.time <- mic.over.time[,,step.range]#[,,c(1:10)]
-  
-  trees.over.time <- modelOutput$trees.over.time[,,step.range]#[,,c(1:10)]
-  time.array <- modelOutput$trees.over.time[,,step.range]#[,,c(1:10)]
-  
-  for (i in c(2:length(trees.over.time[1,1,]))) {
-    time.array[,,i] <- time.array[,,i-1] + trees.over.time[,,i]
-    time.array[,,i][which(trees.over.time[,,i-1]-trees.over.time[,,i]==1)] <- 0
-  }
-  
-  time <- time.steps
-  tree.community <- modelOutput$tree.community
-  forest.matrix <- modelOutput$forest.matrix
-  dummy <-c(1,ceiling(length(unique(forest.matrix$TreeSpecies))/2),length(unique(forest.matrix$TreeSpecies)))
-  dummy <- c(which(tree.community==sort(tree.community,decreasing=TRUE)[1]),
-             which(tree.community==sort(tree.community,decreasing=TRUE)[dummy[2]]),
-             which(tree.community==sort(tree.community,decreasing=TRUE)[dummy[3]]))
-  dummy <-c(1,ceiling(length(unique(forest.matrix$TreeSpecies))/2),length(unique(forest.matrix$TreeSpecies)))
-  dummy <- c(1,3,5)
-  
-  abund.mat <- array(numeric(),c(3,3,time))
-  se.mat <- array(numeric(),c(3,3,time))
-  for (i in c(1:time)) {
-    for (j in c(1:3)) {
-      for (k in c(1:3)) {
-        abund.mat[j,k,i] <- mean(mic.over.time[,dummy[k],][which(time.array[,dummy[j],]==i)])
-        se.mat[j,k,i] <- std.error(mic.over.time[,dummy[k],][which(time.array[,dummy[j],]==i)])
+calculate.microbes.over.time.single.tree <- function(modelOutput, #List of simulation results
+                                                     mu.or.pa, #Mutualists or pathogens "mu" or "pa"
+                                                     time.steps, #Number of time steps to illustrate in plot
+                                                     step.range, #Number of time steps over which to calculate average dynamics
+                                                     indices #Vector indicating which of the model results to average
+                                                     ) {
+  for (x in indices) {
+    if (mu.or.pa=="mu") {
+      mic.over.time <- modelOutput[[x]]$mutualists.over.time
+      ylab = "Mutualist abundance"
+    }
+    else {
+      mic.over.time <- modelOutput[[x]]$pathogens.over.time
+      ylab = "Pathogen abundance"
+    }
+    mic.over.time <- mic.over.time[,,step.range]
+    
+    trees.over.time <- modelOutput[[x]]$trees.over.time[,,step.range]
+    time.array <- modelOutput[[x]]$trees.over.time[,,step.range]
+    
+    for (i in c(2:length(trees.over.time[1,1,]))) {
+      time.array[,,i] <- time.array[,,i-1] + trees.over.time[,,i]
+      time.array[,,i][which(trees.over.time[,,i-1]-trees.over.time[,,i]==1)] <- 0
+    }
+    
+    time <- time.steps
+    tree.community <- modelOutput[[x]]$tree.community
+    forest.matrix <- modelOutput[[x]]$forest.matrix
+    dummy <-c(1,ceiling(length(unique(forest.matrix$TreeSpecies))/2),length(unique(forest.matrix$TreeSpecies)))
+    dummy <- c(which(tree.community==sort(tree.community,decreasing=TRUE)[1]),
+               which(tree.community==sort(tree.community,decreasing=TRUE)[dummy[2]]),
+               which(tree.community==sort(tree.community,decreasing=TRUE)[dummy[3]]))
+    dummy <-c(1,ceiling(length(unique(forest.matrix$TreeSpecies))/2),length(unique(forest.matrix$TreeSpecies)))
+    dummy <- c(1,3,5)
+    
+    abund.mat <- array(numeric(),c(3,3,time))
+    for (i in c(1:time)) {
+      for (j in c(1:3)) {
+        for (k in c(1:3)) {
+          abund.mat[j,k,i] <- mean(mic.over.time[,dummy[k],][which(time.array[,dummy[j],]==i)])
+        }
       }
     }
+    df <- data.frame("Focal.tree"=rep(rep(c("High","Medium","Low"),3),time),
+                     "Preferred.host"= rep(rep(c("High","Medium","Low"),each=3),time),
+                     "Abundance"=as.vector(abund.mat),
+                     "Time"=rep(c(1:time),each=9))
+    df$Time <- df$Time*5
+    
+    if (x == min(indices)) {
+      dff <- df
+    }
+    else {
+      dff <- bind_rows(dff,df)
+    }
   }
-  
-  df <- data.frame("Focal.tree"=rep(rep(c("High","Medium","Low"),3),time),
-                   "Preferred.host"= rep(rep(c("High","Medium","Low"),each=3),time),
-                   "Abundance"=as.vector(abund.mat),"std.error"=as.vector(se.mat),
-                   "Time"=rep(c(1:time),each=9))
-  df$Time <- df$Time*5
+  df <- aggregate(Abundance ~ Focal.tree +
+                    Preferred.host +
+                    Time,data=dff,FUN=mean)
+  df$std.error <- aggregate(Abundance ~ Focal.tree +
+                              Preferred.host +
+                              Time,data=dff,FUN=std.error)$Abundance
   
   if (mu.or.pa =="mu") {
     df$Guild <- "Mutualists"
@@ -449,21 +467,20 @@ calculate.microbes.over.time.single.tree <- function(modelOutput,
 #plot.microbes.over.time
 #Returns plot of output from calculate.microbes.over.time.single.tree
 #######################
-plot.microbes.over.time <- function(mutualists.over.time,
-                                    pathogens.over.time) {
-
+plot.microbes.over.time <- function(mutualists.over.time, #Output from calculate.microbes.over.time.single.tree 
+                                    pathogens.over.time #Output from calculate.microbes.over.time.single.tree 
+                                    ) {
+  
   df <- rbind(mutualists.over.time,pathogens.over.time)
-  colourCount <- 3#length(unique(dat$Tree.species))
+  colourCount <- 3
   getPalette1 = colorRampPalette(brewer.pal(3, "Dark2"))
   getPalette2 = colorRampPalette(brewer.pal(5, "PuOr"))
-  colors1 <- c(getPalette1(1))#,"gray")
+  colors1 <- c(getPalette1(1))
   colors2 <- c(getPalette2(2))
   colors <- c(colors2[1],colors2[2],colors1)
   
-  df$Focal.tree = factor(df$Focal.tree, levels=c('High','Medium','Low'))
+  df$Focal.tree = factor(df$Focal.tree, levels=c('Low','Medium','High'))
   
-  #df$Abundance <- df$Abundance/(1-df$Abundance)
-  #df$std.error <- df$std.error/(1-df$std.error)
   plot <- ggplot(df,aes(x=Time,y=Abundance,color=Preferred.host,linetype=Guild)) +
     scale_linetype_manual(values=c("dotted","dashed")) +
     facet_wrap(~Focal.tree) +
@@ -477,66 +494,79 @@ plot.microbes.over.time <- function(mutualists.over.time,
     labs(x = "Time since recruitment (years)",y="Abundance")
   plot
 }
-
 #######################
 #survival.over.time.single.tree
 #Calculates and plots average survival probability dynamics of seedlings beneath three focal tree species
 #######################
-survival.over.time.single.tree <- function(modelOutput,
-                                           time.steps,
-                                           step.range) {
-  forest.matrix <- modelOutput$forest.matrix
-  surv.over.time <- modelOutput$survival.over.time[,,step.range]
-  trees.over.time <- modelOutput$trees.over.time[,,step.range]
-  time.array <- modelOutput$trees.over.time[,,step.range]
-  for (i in c(2:length(trees.over.time[1,1,]))) {
-    time.array[,,i] <- time.array[,,i-1] + trees.over.time[,,i]
-    time.array[,,i][which(trees.over.time[,,i-1]-trees.over.time[,,i]==1)] <- 0
-  }
-  
-  time <- time.steps
-  dummy <-c(1,ceiling(length(unique(forest.matrix$TreeSpecies))/2),length(unique(forest.matrix$TreeSpecies)))
-  tree.community <- modelOutput$tree.community
-  dummy <- c(which(tree.community==sort(tree.community,decreasing=TRUE)[1]),
-             which(tree.community==sort(tree.community,decreasing=TRUE)[dummy[2]]),
-             which(tree.community==sort(tree.community,decreasing=TRUE)[dummy[3]]))
-  dummy <- c(1,3,5)#c(1,ceiling(length(unique(forest.matrix$TreeSpecies))/2),length(unique(forest.matrix$TreeSpecies)))
-  
-  surv.mat <- array(numeric(),c(3,3,time))
-  se.mat <- array(numeric(),c(3,3,time))
-  
-  for (i in c(1:time)) {
-    for (j in c(1:3)) {
-      for (k in c(1:3)) {
-        surv.mat[j,k,i] <- mean(surv.over.time[,dummy[k],][which(time.array[,dummy[j],]==i)])
-        se.mat[j,k,i] <- std.error(surv.over.time[,dummy[k],][which(time.array[,dummy[j],]==i)])
+survival.over.time.single.tree <- function(modelOutput, #List of simulation results
+                                           time.steps, #Number of time steps to illustrate in plot
+                                           step.range, #Number of time steps over which to calculate average dynamics
+                                           indices #Vector indicating which of the model results to average
+                                           ) {
+  for (x in indices) {
+    forest.matrix <- modelOutput[[x]]$forest.matrix
+    surv.over.time <- modelOutput[[x]]$survival.over.time[,,step.range]
+    trees.over.time <- modelOutput[[x]]$trees.over.time[,,step.range]
+    time.array <- modelOutput[[x]]$trees.over.time[,,step.range]
+    for (i in c(2:length(trees.over.time[1,1,]))) {
+      time.array[,,i] <- time.array[,,i-1] + trees.over.time[,,i]
+      time.array[,,i][which(trees.over.time[,,i-1]-trees.over.time[,,i]==1)] <- 0
+    }
+    
+    time <- time.steps
+    dummy <-c(1,ceiling(length(unique(forest.matrix$TreeSpecies))/2),length(unique(forest.matrix$TreeSpecies)))
+    tree.community <- modelOutput[[x]]$tree.community
+    dummy <- c(which(tree.community==sort(tree.community,decreasing=TRUE)[1]),
+               which(tree.community==sort(tree.community,decreasing=TRUE)[dummy[2]]),
+               which(tree.community==sort(tree.community,decreasing=TRUE)[dummy[3]]))
+    dummy <- c(1,3,5)
+    surv.mat <- array(numeric(),c(3,3,time))
+
+    for (i in c(1:time)) {
+      for (j in c(1:3)) {
+        for (k in c(1:3)) {
+          surv.mat[j,k,i] <- mean(surv.over.time[,dummy[k],][which(time.array[,dummy[j],]==i)])
+          #se.mat[j,k,i] <- std.error(surv.over.time[,dummy[k],][which(time.array[,dummy[j],]==i)])
+        }
       }
     }
+    
+    df <- data.frame("Focal.tree"=rep(rep(c("High","Medium","Low"),3),time),
+                     "Preferred.host"= rep(rep(c("High","Medium","Low"),each=3),time),
+                     "Survival"=as.vector(surv.mat),
+                     "Time"=rep(rep(c(1:time),each=9)))
+    
+    if (x == min(indices)) {
+      dff <- df
+    }
+    else {
+      dff <- bind_rows(dff,df)
+    }
+    
   }
   
-  df <- data.frame("Focal.tree"=rep(rep(c("High","Medium","Low"),3),time),
-                   "Preferred.host"= rep(rep(c("High","Medium","Low"),each=3),time),
-                   "Survival"=as.vector(surv.mat),"std.error"=as.vector(se.mat),
-                   "Time"=rep(rep(c(1:time),each=9)))
+  df <- aggregate(Survival ~ Focal.tree +
+                    Preferred.host +
+                    Time,data=dff,FUN=mean)
+  df$std.error <- aggregate(Survival ~ Focal.tree +
+                              Preferred.host +
+                              Time,data=dff,FUN=std.error)$Survival
   
-  colourCount <- 3#length(unique(dat$Tree.species))
+  colourCount <- 3
   getPalette1 = colorRampPalette(brewer.pal(3, "Dark2"))
   getPalette2 = colorRampPalette(brewer.pal(5, "PuOr"))
   colors1 <- c(getPalette1(1))#,"gray")
   colors2 <- c(getPalette2(2))
   colors <- c(colors2[1],colors2[2],colors1)
   
-  df$Focal.tree = factor(df$Focal.tree, levels=c('High','Medium','Low'))
+  df$Focal.tree = factor(df$Focal.tree, levels=c('Low','Medium','High'))
   
   df$Time <- df$Time*5
-  df$Survival <- df$Survival/(1-df$Survival)
-  df$std.error <- df$std.error/(1-df$std.error)
+  
   plot <- ggplot(df,aes(x=Time,y=Survival,color=Preferred.host)) +
     facet_wrap(~Focal.tree) +
     geom_line() +
     geom_ribbon(aes(ymin=Survival-std.error,ymax=Survival+std.error,fill=Preferred.host),alpha=0.3,color=NA) +
-    #geom_line(data=df,aes(x=Time,y=Survival+std.error,color=Preferred.host),linetype="dashed") +
-    #geom_line(data=df,aes(x=Time,y=Survival-std.error,color=Preferred.host),linetype="dashed") +
     theme_bw() +
     scale_color_manual(values=colors) +
     scale_fill_manual(values=colors) +
@@ -548,10 +578,11 @@ survival.over.time.single.tree <- function(modelOutput,
 #plot.tree.abundances.over.time
 #Plots mean +/- se abundance of three focal species through time
 #######################
-plot.tree.abundances.over.time <- function(model.output,
-                                           step.range,
-                                           indices,
-                                           xlim) {
+plot.tree.abundances.over.time <- function(model.output, #List of simulation results
+                                           step.range, #Time step range over which to plot results
+                                           indices, #Vector indicating which simulation results to average
+                                           xlim #Another way to constrain x axis
+                                           ) {
   for (i in indices) {
     forest.matrix <- model.output[[i]]$forest.matrix
     tree.community <- model.output[[i]]$tree.community
@@ -594,7 +625,7 @@ plot.tree.abundances.over.time <- function(model.output,
   dat$std.error.max[which(dat$std.error.max>1)] <- 1
   
   
-  ggplot(data=dat,aes(x=time, y=Abundances, colour=tree.species))+# + scale_colour_gradient(low = "#132B43", high = "#56B1F7") +
+  ggplot(data=dat,aes(x=time, y=Abundances, colour=tree.species))+
     theme_bw()+
     xlim(xlim) +    
     theme(
