@@ -13,7 +13,8 @@ Simulation\_functions.R. We also include results from 16K simulations
 runs using random parameter values in
 ./RunFiles/sim\_results\_random.RData. Simulation results from the
 step-wise optimization are stored in files labeled
-./RunFiles/sim\_opt\_step\*.RData.
+./RunFiles/sim\_opt\_step\*.RData. This project is archived under:
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3735452.svg)](https://doi.org/10.5281/zenodo.3735452)
 
 The following R packages are required to run the simulation
 

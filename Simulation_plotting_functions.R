@@ -447,6 +447,7 @@ calculate.microbes.over.time.single.tree <- function(modelOutput, #List of simul
       dff <- bind_rows(dff,df)
     }
   }
+
   df <- aggregate(Abundance ~ Focal.tree +
                     Preferred.host +
                     Time,data=dff,FUN=mean)
