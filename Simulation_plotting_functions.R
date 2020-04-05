@@ -509,6 +509,7 @@ survival.over.time.single.tree <- function(modelOutput, #List of simulation resu
     surv.over.time <- modelOutput[[x]]$survival.over.time[,,step.range]
     trees.over.time <- modelOutput[[x]]$trees.over.time[,,step.range]
     time.array <- modelOutput[[x]]$trees.over.time[,,step.range]
+
     for (i in c(2:length(trees.over.time[1,1,]))) {
       time.array[,,i] <- time.array[,,i-1] + trees.over.time[,,i]
       time.array[,,i][which(trees.over.time[,,i-1]-trees.over.time[,,i]==1)] <- 0
